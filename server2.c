@@ -83,13 +83,17 @@ init_player(int i, int sock) {
 
 void
 read_client_msg() {
-	int i, size;
+	int i, j, size;
 	char msg[200], dir;
 	for (i = 0; i < players_no; i++) {
 		size = recv(players[i].socket, msg, sizeof(msg), 0);
 		if (size != -1) {
 			dir = msg[0];
 			players[i].dir = dir;
+			for (j = 0; j < players_no; j++) {
+				sprintf(msg, "CHDIR %d %c\n", i, dir);
+				write(players[j].socket, msg, strlen(msg));
+			}
 		}
 	}
 }
