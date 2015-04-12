@@ -9,33 +9,12 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 
-void
-eprintf(char *e) {
-	fprintf(stderr, "%s\n", e);
-	exit(1);
-}
+#include "protocol.h"
 
-/*
--------> x
-|0,0
-|
-|
-|
-V
-y
-*/
-enum {map_x = 50, map_y = 20 };
 int map[map_x][map_y];
 
-typedef struct Player Player;
-struct Player {
-	char dir; /*N, S, E, W*/
-	int x, y;
-	int alive;
-	int socket;
-};
-int players_no=0;
 Player players[4];
+int players_no=0;
 
 void
 init_map() {
@@ -51,35 +30,7 @@ init_map() {
 	}
 }
 
-void
-init_player(int i, int sock) {
-	int margin=10;
-	players[i].socket = sock;
-	players[i].alive = 1;
-	switch (i) {
-		case 0:
-			players[i].x = margin;
-			players[i].y = margin;
-			players[i].dir = 'E';
-			break;
-		case 1:
-			players[i].x = map_x - margin;
-			players[i].y = margin;
-			players[i].dir = 'W';
-			break;
-		case 2:
-			players[i].x = map_y -margin;
-			players[i].y = map_x - margin;
-			players[i].dir = 'E';
-			break;
-		case 3:
-			players[i].x = margin;
-			players[i].y = map_y - margin;
-			players[i].dir = 'W';
-			break;
-			
-	}
-}
+
 
 void
 read_client_msg() {
@@ -166,7 +117,6 @@ main(int argc, char *argv[]) {
 	int i;
 	char msg[200];
 	struct timespec slp;
-	int tick_ms = 200;
 	
 	if (argc < 2)
 		players_no = 1;
@@ -179,7 +129,7 @@ main(int argc, char *argv[]) {
 
 	server.sin_family = AF_INET;
 	server.sin_addr.s_addr = INADDR_ANY;
-	server.sin_port = htons( 8000 );
+	server.sin_port = htons(port_nr);
 
 	/*bind*/
 	if (bind(socket_desc, (struct sockaddr *)&server, sizeof(server)) < 0)	
@@ -200,7 +150,7 @@ main(int argc, char *argv[]) {
 		write(client_sock, msg, strlen(msg));
 	}
 	
-	sprintf(msg, "START %d %d %d %d\n", map_x, map_y, players_no, tick_ms);
+	sprintf(msg, "START\n");
 	for (i = 0; i < players_no; i++)
 		write(players[i].socket, msg, strlen(msg));
 	
@@ -209,7 +159,7 @@ main(int argc, char *argv[]) {
 		update_map();
 		if (game_over())
 			break;
-		show_map();
+		//show_map();
 		slp.tv_sec = 0;
 		slp.tv_nsec = tick_ms*1000000;
 		nanosleep(&slp, NULL);
