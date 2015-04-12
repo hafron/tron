@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <time.h>
 
 #include <unistd.h>
@@ -30,21 +31,29 @@ init_map() {
 	}
 }
 
+void
+send_msg(int sock, char *format, ...) {
+	char msg[msg_len];
+	va_list ap;
+	va_start(ap, format);
+	vsprintf(msg, format, ap);
+	va_end(ap);
+	write(sock, msg, msg_len);
+	printf("%s\n", msg);
+}
 
 
 void
 read_client_msg() {
 	int i, j, size;
-	char msg[200], dir;
+	char msg[msg_len], dir;
 	for (i = 0; i < players_no; i++) {
 		size = recv(players[i].socket, msg, sizeof(msg), 0);
 		if (size != -1) {
 			dir = msg[0];
 			players[i].dir = dir;
-			for (j = 0; j < players_no; j++) {
-				sprintf(msg, "CHDIR %d %c\n", i, dir);
-				write(players[j].socket, msg, strlen(msg));
-			}
+			for (j = 0; j < players_no; j++)
+				send_msg(players[j].socket, "CHDIR %d %c %d %d", i, dir, players[i].x, players[i].y);
 		}
 	}
 }
@@ -73,10 +82,8 @@ update_map() {
 		}
 		if (map[players[i].x][players[i].y] == 1) {
 			players[i].alive = 0;
-			sprintf(msg, "CRASH %d %d %d\n", i, players[i].x, players[i].y);
-			printf("%s", msg);
 			for (j = 0; j < players_no; j++)
-				write(players[j].socket, msg, strlen(msg));
+				send_msg(players[j].socket, "CRASH %d %d %d", i, players[i].x, players[i].y);
 		} else
 			map[players[i].x][players[i].y] = 1;
 	}
@@ -146,13 +153,11 @@ main(int argc, char *argv[]) {
 		client_sock = accept(socket_desc, (struct sockaddr *)&client, (socklen_t*)&c);
 		fcntl(client_sock, F_SETFL, O_NONBLOCK);
 		init_player(i, client_sock);
-		sprintf(msg, "ID %d\n", i);
-		write(client_sock, msg, strlen(msg));
+		send_msg(client_sock, "ID %d %d", i, players_no);
 	}
 	
-	sprintf(msg, "START\n");
 	for (i = 0; i < players_no; i++)
-		write(players[i].socket, msg, strlen(msg));
+		send_msg(players[i].socket, "START");
 	
 	for (;;) {
 		read_client_msg();

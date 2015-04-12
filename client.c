@@ -1,6 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <unistd.h>
+#include <fcntl.h>
+
 #include<sys/socket.h>
 #include<arpa/inet.h>
 
@@ -81,7 +84,6 @@ int
 connect_to_server() {
 	int sock;
 	struct sockaddr_in server;
-	char message[1000] , server_reply[2000];
      
 	//Create socket
 	sock = socket(AF_INET , SOCK_STREAM , 0);
@@ -99,44 +101,22 @@ connect_to_server() {
 	return sock;
 }
 
-/*może się przepełnić*/
-char fifo[100][200];
-int nfifo = 0, fifo_id = 0;
-
-int
-read_msg(int sock) {
-	int i, l;
-	char msg[2000], *pmsg, *lsmsg;
-	
-	if (nfifo > fifo_id) {
-		printf("%s\n", fifo[fifo_id]);
-		fifo_id++;
-		return fifo_id-1;
-	}
-	
-	l = recv(sock, msg, sizeof(msg), 0);
-	if (l > 0) {
-		pmsg = lsmsg = msg;
-		for (i = 0; i < l; i++) {
-			if (*pmsg == '\n') {
-				*pmsg  = '\0';
-				strcpy(fifo[nfifo++], lsmsg);
-				lsmsg = pmsg+1;
-			}
-			pmsg++;
-		}
-		
-		/*wyrzuć najnowszy z kolejki i do boju*/
-		fifo_id++;
-		return fifo_id-1;
-	}
-	return -1;
+void
+send_msg(int sock, char *format, ...) {
+	char msg[msg_len];
+	va_list ap;
+	va_start(ap, format);
+	vsprintf(msg, format, ap);
+	va_end(ap);
+	send(sock, msg, msg_len, 0);
+	printf("%s\n", msg);
 }
 
 int
 main(int argc, char *argv[]) {
 	int quit, i, sock;
 	chain *ch;
+	char msg[msg_len];
 	int id;
 	
 	if (argc > 1)
@@ -145,23 +125,22 @@ main(int argc, char *argv[]) {
 		strcpy(address, "127.0.0.1");
 	
 	sock = connect_to_server();
-	read_msg(sock);
 	
-	players_no = 1;
-	players[0].dir = 'E';
-	players[0].x = 10;
-	players[0].y = 10;
-	players[0].alive = 1;
-	
+	recv(sock, msg, msg_len, 0);
+	sscanf(msg, "ID %d %d", &id, &players_no);
+	printf("your id: %d\n", id);
+
 	for (i = 0; i < players_no; i++) {
+		init_player(i, -1);
+		
 		ch = emalloc(sizeof(chain));
-		ch->x = players[0].x;
-		ch->y = players[0].y;
+		ch->x = players[i].x;
+		ch->y = players[i].y;
 		chains[i] = ch;
 		
 		ch = emalloc(sizeof(chain));
-		ch->x = players[0].x;
-		ch->y = players[0].y;
+		ch->x = players[i].x;
+		ch->y = players[i].y;
 		ch->next = NULL;
 		
 		chains[i]->next = ch;
@@ -171,6 +150,14 @@ main(int argc, char *argv[]) {
 
 	init_sdl();
 	quit = 0;
+		
+	/*oczekiwanie na start*/
+	recv(sock, msg, msg_len, 0);
+	printf("-> %s\n", msg);
+	
+	/*przechodzimy w tryb nieblokujący*/
+	fcntl(sock, F_SETFL, O_NONBLOCK);
+	
 	while (!quit) {
 		SDL_Event e;
 		while (SDL_PollEvent(&e))
@@ -207,18 +194,39 @@ main(int argc, char *argv[]) {
                         		}
                         		
                         		if (chdir != 0) {
-                        			players[id].dir = chdir;
-					ch = emalloc(sizeof(chain));
-					ch->x = chain_tails[id]->x;
-					ch->y = chain_tails[id]->y;
-					
-					chain_tails[id]->next = ch;
-					chain_tails[id] = ch;
+                        			send_msg(sock, "%c", chdir);
+
                         		}
                         	}
                         	
                    /*sprawdzamy czy nie nadszedł jakiś komunikat*/
-                   
+                   if (recv(sock, msg, msg_len, 0) > 0) {
+                   	printf("-> %s\n", msg);
+                   	char com[20];
+                   	sscanf(msg, "%s", com);
+                   	if (strcmp(com, "CHDIR") == 0) {
+                   		int ch_id, ch_x, ch_y;
+                   		char ch_dir;
+                   		sscanf(msg, "%s %d %c %d %d", com, &ch_id, &ch_dir, &ch_x, &ch_y);
+				players[ch_id].dir = ch_dir;
+				/*nanosimy poprawkę*/
+				chain_tails[ch_id]->x = ch_x;
+				chain_tails[ch_id]->y = ch_y;
+				ch = emalloc(sizeof(chain));
+				ch->x = ch_x;
+				ch->y = ch_y;
+				ch->next = NULL;
+					
+				chain_tails[ch_id]->next = ch;
+				chain_tails[ch_id] = ch;
+                   	} else if (strcmp(com, "CRASH") == 0) {
+                   		int cr_id, cr_x, cr_y;
+                   		sscanf(msg, "%s %d %d %d", com, &cr_id, &cr_x, &cr_y);
+                   		players[cr_id].alive = 0;
+                   		chain_tails[cr_id]->x = cr_x;
+                   		chain_tails[cr_id]->y = cr_y;
+                   	}
+                   }
                    /*koniec*/
   
 		//Clear screen

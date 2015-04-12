@@ -8,6 +8,8 @@ V
 y
 */
 enum {map_x = 300, map_y = 300 };
+enum {msg_len = 200};
+
 typedef struct Player Player;
 struct Player {
 	char dir; /*N, S, E, W*/
