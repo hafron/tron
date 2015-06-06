@@ -72,6 +72,15 @@ polygonal_chain(chain *ch) {
 	y = ch->y;
 	for (ch = ch->next; ch != NULL; ch = ch->next) {
 		SDL_RenderDrawLine(gRenderer, x, y, ch->x, ch->y);
+		/*pogrubiamy linie*/
+		/*linia pionowa*/
+		if (x == ch->x) {
+			SDL_RenderDrawLine(gRenderer, x-1, y, ch->x-1, ch->y);
+			SDL_RenderDrawLine(gRenderer, x+1, y, ch->x+1, ch->y);
+		} else {
+			SDL_RenderDrawLine(gRenderer, x, y-1, ch->x, ch->y-1);
+			SDL_RenderDrawLine(gRenderer, x, y+1, ch->x, ch->y+1);
+		}
 		x = ch->x;
 		y = ch->y;
 	}
@@ -193,10 +202,19 @@ main(int argc, char *argv[]) {
 					break;
                         		}
                         		
-                        		if (chdir != 0) {
-                        			send_msg(sock, "%c", chdir);
-
-                        		}
+                        		if (chdir == 0 || players[id].dir == chdir)
+                        			continue;
+                        		/*nie zmieniamy kierunku na "wsteczny"*/
+                        		if (players[id].dir == 'E' && chdir == 'W')
+                        			continue;
+                        		if (players[id].dir == 'W' && chdir == 'E')
+                        			continue;
+                        		if (players[id].dir == 'N' && chdir == 'S')
+                        			continue;
+                        		if (players[id].dir == 'S' && chdir == 'N')
+                        			continue;
+                        		
+                        		send_msg(sock, "%c", chdir);
                         	}
                         	
                    /*sprawdzamy czy nie nadszedł jakiś komunikat*/
@@ -235,7 +253,7 @@ main(int argc, char *argv[]) {
 		
 		/*rysujemy krzywe graczy*/
 		for (i = 0; i < players_no; i++) {
-			if (players[i].alive)
+			
 			switch(i) {
 				case 0:
 					SDL_SetRenderDrawColor(gRenderer, 0xFF, 0x00, 0x00, 0xFF);
@@ -250,6 +268,17 @@ main(int argc, char *argv[]) {
 					SDL_SetRenderDrawColor(gRenderer, 0xFF, 0x00, 0xFF, 0xFF);
 					break;
 			}
+			/*narysuj w rogu kolor gracza*/
+			if (i == id) {
+				SDL_Rect r;
+				r.x = 0;
+				r.y = 0;
+				r.w = 10;
+				r.h = 10;
+				SDL_RenderFillRect(gRenderer, &r);
+			}
+			if (!players[i].alive)
+				continue;
 			polygonal_chain(chains[i]);
 			
 			ch = chain_tails[i];

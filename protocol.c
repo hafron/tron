@@ -41,12 +41,12 @@ init_player(int i, int sock) {
 		case 2:
 			players[i].x = map_y -margin;
 			players[i].y = map_x - margin;
-			players[i].dir = 'E';
+			players[i].dir = 'W';
 			break;
 		case 3:
 			players[i].x = margin;
 			players[i].y = map_y - margin;
-			players[i].dir = 'W';
+			players[i].dir = 'E';
 			break;
 			
 	}

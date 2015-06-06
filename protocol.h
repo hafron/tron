@@ -18,7 +18,7 @@ struct Player {
 	int socket;
 };
 
-static int tick_ms=20;
+static int tick_ms=100;
 static int margin=10;
 
 static int port_nr = 8001;

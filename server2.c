@@ -59,6 +59,16 @@ read_client_msg() {
 }
 
 void
+sync() {
+	int i, j;
+	char msg[msg_len], dir;
+	for (i = 0; i < players_no; i++)
+			for (j = 0; j < players_no; j++)
+				send_msg(players[j].socket, \
+				"CHDIR %d %c %d %d", i, players[i].dir, players[i].x, players[i].y);
+}
+
+void
 update_map() {
 	int i,j;
 	char msg[50];
@@ -130,6 +140,8 @@ main(int argc, char *argv[]) {
 	else
 		players_no = atoi(argv[1]);
 
+
+	/*SOCK_STREAM - TCP; SOCK_DGRAM - UDP*/
 	socket_desc = socket(AF_INET, SOCK_STREAM, 0);
 	if (socket_desc == -1)
 		eprintf("could not create socket");
@@ -137,6 +149,14 @@ main(int argc, char *argv[]) {
 	server.sin_family = AF_INET;
 	server.sin_addr.s_addr = INADDR_ANY;
 	server.sin_port = htons(port_nr);
+
+	/*http://stackoverflow.com/questions/5592747/bind-error-while-recreating-socket*/
+	int yes=1;
+	if (setsockopt(socket_desc, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)) == -1) {
+    		eprintf("setsockopt");
+    		exit(1);
+	}
+
 
 	/*bind*/
 	if (bind(socket_desc, (struct sockaddr *)&server, sizeof(server)) < 0)	
@@ -158,13 +178,17 @@ main(int argc, char *argv[]) {
 	
 	for (i = 0; i < players_no; i++)
 		send_msg(players[i].socket, "START");
+	sync();
 	
-	for (;;) {
+	for (i = 0;;i++) {
 		read_client_msg();
+		if (i > 10) {
+			sync();
+			i = 0;
+		}
 		update_map();
 		if (game_over())
 			break;
-		//show_map();
 		slp.tv_sec = 0;
 		slp.tv_nsec = tick_ms*1000000;
 		nanosleep(&slp, NULL);
